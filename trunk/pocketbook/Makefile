@@ -2,7 +2,7 @@
 
 SDKPREFIX=/usr/local/pocketbook
 OUT = dominos
-SOURCES = dominos.cpp dmain.cpp help.cpp
+SOURCES = dominos.cpp dmain.cpp help.cpp messages.c
 
 CXX = wineg++
 CC = winegcc

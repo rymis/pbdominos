@@ -112,8 +112,162 @@ def msg_grep(args):
             db.messages[m] = {}
     db.save()
 
+def c_str(s):
+    return '"%s"' % s.replace('"', '\\"')
+
 def msg_compile(args):
-    pass
+    if len(args) > 0:
+        fn = args[0]
+    else:
+        fn = 'messages'
+
+    db = MessagesDB()
+
+    # We must collect all messages from domains:
+    domains = [ ]
+    for m in db.messages:
+        for d in db.messages[m]:
+            if d not in domains:
+                domains.append(d)
+
+    if len(domains) == 0:
+        print "Warning: empty domains. Invalid messages?"
+
+    f = open(fn + ".c", "wt")
+    f.write("""
+/* This file is generated automatically from messages.db */
+#include <string.h>
+#include <stdlib.h>
+
+/* For compilers that does not support 'const' */
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+
+typedef struct translation_st {
+    char *msg;
+%s
+} translation;
+
+""" % "".join(['    char *l_%s;\n' % s for s in domains]))
+    # Write translations:
+    msgs = [ m for m in db.messages ]
+    msgs.sort()
+
+    f.write("static translation messages[] = {\n")
+    for m in msgs:
+        f.write("    { %s" % c_str(m))
+        for d in domains:
+            if d in db.messages[m]:
+                f.write(", %s" % c_str(db.messages[m][d]))
+            else:
+                f.write(", NULL")
+        f.write(" },\n")
+    f.write("    { NULL }\n};\n")
+
+    f.write("""
+
+/* Functions: */
+
+static const int messages_cnt = sizeof(messages) / sizeof(translation) - 1;
+static char lang_buf[3];
+static const char *g_lang = NULL;
+static int initialized = 0;
+
+void sgettext_lang_init(const char *lang)
+{
+    /* TODO: get LC_ALL, LC_MESSAGES... */
+    if (lang) {
+        g_lang = lang;
+        initialized = 1;
+        return;
+    } else {
+        const char *lc = getenv("LC_MESSAGES");
+        if (lc) {
+            lang_buf[0] = lc[0];
+            lang_buf[1] = lc[1];
+            lang_buf[2] = 0;
+            g_lang = lang_buf;
+            initialized = 1;
+            return;
+        }
+        lc = getenv("LC_ALL");
+        if (lc) {
+            lang_buf[0] = lc[0];
+            lang_buf[1] = lc[1];
+            lang_buf[2] = 0;
+            g_lang = lang_buf;
+            initialized = 1;
+            return;
+        }
+    }
+    initialized = 1;
+    g_lang = NULL;
+}
+
+const char *x_translation(translation *t, const char *domain)
+{
+    %s{
+        return t->msg;
+    }
+}
+
+const char *slgettext(const char *msg, const char *lang)
+{
+	int l = 0;
+	int r = messages_cnt - 1;
+	int c, cmp;
+	/* Find message for this language: */
+
+	if (!messages_cnt)
+		return msg;
+
+    if (!lang)
+        return msg;
+
+	while (r - l > 1) {
+		c = (r + l) / 2;
+		cmp = strcmp(messages[c].msg, msg);
+
+		if (cmp == 0) {
+			return x_translation(messages + c, lang);
+		} else if (cmp < 0) {
+			r = c;
+		} else /* if (cmp > 0) */ {
+			l = c;
+		}
+	}
+
+	if (!strcmp(messages[r].msg, msg)) {
+		return x_translation(messages + r, lang);
+	} else if (!strcmp(messages[l].msg, msg)) {
+		return x_translation(messages + l, lang);
+	}
+
+	return msg;
+}
+
+const char *sgettext(const char *msg)
+{
+	if (!initialized)
+		sgettext_lang_init(NULL);
+
+	return sdgettext(msg, g_lang);
+}
+
+""" % "".join(["if (!strcmp(domain, %s)) {\n        return t->l_%s;\n    } else " % (c_str(d), d) for d in domains]))
+    f.close() # C-file ready
+
+    f = open("%s.h" % fn, "wt");
+    f.write("#ifndef SGETTEXT___%s___H\n" % fn)
+    f.write("#define SGETTEXT___%s___H\n" % fn)
+
+    f.write("const char *sgettext(const char *msg);\n")
+    f.write("const char *slgettext(const char *msg, const char *lang);\n")
+    f.write("void sgettext_lang_init(const char *lang);\n")
+
+    f.write("#endif\n")
+    f.close()
 
 def main():
     if len(sys.argv) < 2:
