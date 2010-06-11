@@ -517,7 +517,7 @@ it->print(std::cout);
 	//! public player interface:
 	class player {
 		friend class game;
-		protected:
+		public:
 			//! Player tiles:
 			std::vector<tile> tiles;
 		public:
@@ -579,7 +579,10 @@ it->print(std::cout);
 		}
 
 		//! all tiles
+		// TODO: interface for drawing...
+		public:
 		std::vector<tile> tiles;
+		private:
 		unsigned current_tile;
 		player* get_player(int num)
 		{
