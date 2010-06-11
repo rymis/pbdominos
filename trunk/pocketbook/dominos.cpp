@@ -22,7 +22,7 @@ namespace dominos {
 	pocketbook_board *brd = 0;
 	game *ggame = 0;
 
-	void draw_game();
+	void draw_game(bool open_tiles = false);
 	int iv_select_tile(int type, int par1, int par2);
 
 	/* For some reasons, that I can't understand pbres don't want process my images.
@@ -283,7 +283,7 @@ namespace dominos {
 
 	};
 
-	void draw_game()
+	void draw_game(bool open_tiles)
 	{
 		ClearScreen();
 
@@ -294,12 +294,18 @@ namespace dominos {
 		// Now we must draw players:
 		cnt = player_2->tiles_cnt();
 		for (i = 0; i < cnt; i++) {
-			draw_back_tile(10 + i * (tWidth + 10), 10);
+			if (!open_tiles)
+				draw_back_tile(10 + i * (tWidth + 10), 10);
+			else
+				draw_vtile(10 + i * (tWidth + 10), 10, player_2->tiles[i]);
 		}
 
 		cnt = player_3->tiles_cnt();
 		for (i = 0; i < cnt; i++) {
-			draw_back_tile(310 + i * (tWidth + 10), 10);
+			if (!open_tiles)
+				draw_back_tile(310 + i * (tWidth + 10), 10);
+			else
+				draw_vtile(310 + i * (tWidth + 10), 10 , player_3->tiles[i]);
 		}
 
 		player_1->draw_tiles();
@@ -307,7 +313,10 @@ namespace dominos {
 		// Draw bank at right side of board:
 		cnt = ggame->tiles_in_bank();
 		for (i = 0; i < cnt; i++) {
-			draw_back_tile(screenWidth - tWidth - 10, tHeight + 30 + i * (tHeight + 10));
+			if (!open_tiles)
+				draw_back_tile(screenWidth - tWidth - 10, tHeight + 30 + i * (tHeight + 10));
+			else
+				draw_vtile(screenWidth - tWidth - 10, tHeight + 30 + i * (tHeight + 10), ggame->tiles[ggame->tiles.size() - i - 1]);
 		}
 
 		FullUpdate();
@@ -355,11 +364,29 @@ namespace dominos {
 		return 0;
 	}
 
+	static enum my_state_enum {
+		wait_events,
+		show_results
+	} my_state = wait_events;
+
+	static void result_message(const std::string &title, const std::string &msg)
+	{
+		// Message(ICON_INFORMATION, (char*)title.c_str(), (char*)msg.c_str(), 10000);
+		draw_text(40, 40, 400, 400, 14, _T(msg.c_str()), 0);
+		draw_game(true);
+		my_state = show_results;
+	}
+
 	static game::round_result g_rresult;
 	static void dont_sleep_baby();
 	static int my_main(int type, int par1, int par2)
 	{
 		std::cout << "my_main(" << type << ", " << par1 << ", " << par2 << ")" << std::endl;
+		if (my_state == show_results) {
+			if (type == EVT_KEYPRESS) {
+				ink_main_quit();
+			}
+		}
 
 		return 0;
 	}
@@ -376,22 +403,17 @@ namespace dominos {
 
 		if (g_rresult.result == game::round_result::finished) {
 			std::cout << "Player " << g_rresult.winner << " win!";
-			draw_game();
 
 			std::stringstream s;
 			s << "Player " << g_rresult.winner << " win!";
-			Message(ICON_INFORMATION, "Win!", (char*)s.str().c_str(), 10000);
 
-			ink_main_quit();
+			result_message(_T("Win!"), s.str());
 		} else if (g_rresult.result == game::round_result::fish) {
 			std::cout << "Player " << g_rresult.winner << " made fish!";
-			draw_game();
 
 			std::stringstream s;
 			s << "Player " << g_rresult.winner << " made fish!";
-			Message(ICON_INFORMATION, "Fish!", (char*)s.str().c_str(), 10000);
-
-			ink_main_quit();
+			result_message(_T("Fish!"), s.str());
 		} else {
 			g_rresult = ggame->next_step();
 			SetWeakTimer("NEXT STEP", dont_sleep_baby, 100);
@@ -425,6 +447,7 @@ namespace dominos {
 		// Clear screen:
 		ClearScreen();
 
+		my_state = wait_events;
 		ink_main(my_main);
 
 		SetWeakTimer("NEXT STEP", dont_sleep_baby, 100);

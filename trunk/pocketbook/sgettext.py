@@ -252,21 +252,32 @@ const char *sgettext(const char *msg)
 	if (!initialized)
 		sgettext_lang_init(NULL);
 
-	return sdgettext(msg, g_lang);
+	return slgettext(msg, g_lang);
 }
 
 """ % "".join(["if (!strcmp(domain, %s)) {\n        return t->l_%s;\n    } else " % (c_str(d), d) for d in domains]))
     f.close() # C-file ready
 
     f = open("%s.h" % fn, "wt");
-    f.write("#ifndef SGETTEXT___%s___H\n" % fn)
-    f.write("#define SGETTEXT___%s___H\n" % fn)
+    f.write("""
+#ifndef SGETTEXT___%s___H
+#define SGETTEXT___%s___H
 
-    f.write("const char *sgettext(const char *msg);\n")
-    f.write("const char *slgettext(const char *msg, const char *lang);\n")
-    f.write("void sgettext_lang_init(const char *lang);\n")
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-    f.write("#endif\n")
+const char *sgettext(const char *msg);
+const char *slgettext(const char *msg, const char *lang);
+void sgettext_lang_init(const char *lang);
+#define _T(m) sgettext((m))
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+    """ % (fn, fn))
     f.close()
 
 def main():

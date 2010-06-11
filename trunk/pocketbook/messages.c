@@ -16,7 +16,9 @@ typedef struct translation_st {
 
 static translation messages[] = {
     { "Congradulations!", "Поздравляю!" },
+    { "Fish!", "Рыба!" },
     { "KOZEL", "КОЗЕЛ!" },
+    { "Win!", "Победа!" },
     { "You are the looser!", "Вы проиграли!" },
     { "You won!", "Вы выиграли!" },
     { NULL }
@@ -110,6 +112,6 @@ const char *sgettext(const char *msg)
 	if (!initialized)
 		sgettext_lang_init(NULL);
 
-	return sdgettext(msg, g_lang);
+	return slgettext(msg, g_lang);
 }
 
